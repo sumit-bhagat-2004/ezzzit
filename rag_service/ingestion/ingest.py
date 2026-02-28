@@ -51,13 +51,11 @@ def read_markdown_files(docs_dir: str = None) -> list[dict]:
     return documents
 
 
-# ✅ FIXED FUNCTION
 def insert_chunks_with_embeddings(chunks: list[dict]):
 
     cursor = get_cursor()
 
     try:
-        # ✅ Snowflake requires positional binding (%s)
         insert_query = """
         INSERT INTO KNOWLEDGE_BASE (ID, CONCEPT, CONTENT, EMBEDDING)
         SELECT
@@ -65,7 +63,7 @@ def insert_chunks_with_embeddings(chunks: list[dict]):
             %s,
             %s,
             SNOWFLAKE.CORTEX.EMBED_TEXT_768(
-                'snowflake-arctic-embed-m',
+                'snowflake-arctic-embed-m-v1.5',
                 %s
             )
         """
