@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Literal
+from typing import Literal, Optional, List, Dict
 
 
 class CodeRequest(BaseModel):
@@ -20,9 +20,23 @@ class TraceStep(BaseModel):
     variables: dict
 
 
+class DataStructure(BaseModel):
+    name: str
+    type: str
+    variables: List[str]
+    description: str
+
+
+class AIAnalysis(BaseModel):
+    structures: List[DataStructure]
+    trace_enrichment: Dict[str, Dict[str, str]]  # {"step_index_mapping": {"1": "explanation"}}
+    summary: str
+
+
 class ExecuteResponse(BaseModel):
     output: str
     trace: list[TraceStep]
     steps: int
     exception: str | None = None
     error: str | None = None
+    ai_analysis: Optional[AIAnalysis] = None  # Added AI analysis field

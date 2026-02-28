@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useRef } from "react";
 import Editor from "@monaco-editor/react";
-import { Play, Sparkles, Terminal } from "lucide-react";
+import { Play, Terminal } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import VoiceExplainControls from "./VoiceExplainControls";
 import ExecutionView from "./ExecutionView";
-import VariableTable from "./VariableTable";
+import VisualizerDispatcher from "./VisualizerDispatcher";
 import TimelineControls from "./TimelineControls";
+import AIAnalysisPanel from "./AIAnalysisPanel";
 import { TracePlayer } from "../lib/TracePlayer";
 
 type TraceStep = {
@@ -19,12 +20,28 @@ type TraceStep = {
   variables: Record<string, unknown>;
 };
 
+type DataStructure = {
+  name: string;
+  type: string;
+  variables: string[];
+  description: string;
+};
+
+type AIAnalysis = {
+  structures: DataStructure[];
+  trace_enrichment: {
+    step_index_mapping: Record<string, string>;
+  };
+  summary: string;
+};
+
 type ExecutionResponse = {
   output: string;
   trace: TraceStep[];
   steps: number;
   exception: string | null;
   error: string | null;
+  ai_analysis?: AIAnalysis | null;
 };
 
 export default function EditorUI() {
@@ -171,7 +188,7 @@ print(result)`);
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-600/20 rounded-full blur-[120px]" />
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-[120px]" />
 
-      <div className="h-full flex flex-col p-2 relative z-10">
+      <div className="h-screen flex flex-col p-2 relative z-10">
         {/* Main Card */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -273,12 +290,12 @@ print(result)`);
             key="execution"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex-1 flex gap-0"
+            className="flex-1 flex gap-0 overflow-hidden"
           >
             {/* Left: 4-panel grid */}
-            <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-0">
+            <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-0 h-full">
               {/* Top Left: Original Editor */}
-              <div className="border-r border-b border-white/10">
+              <div className="border-r border-b border-white/10 overflow-hidden">
                 <div className="h-full">
                   <Editor
                     height="100%"
@@ -290,13 +307,14 @@ print(result)`);
                       fontSize: 13,
                       minimap: { enabled: false },
                       automaticLayout: true,
+                      scrollBeyondLastLine: false,
                     }}
                   />
                 </div>
               </div>
 
               {/* Top Right: Execution View */}
-              <div className="border-b border-white/10">
+              <div className="border-b border-white/10 overflow-hidden">
                 <ExecutionView
                   code={code}
                   language={language}
@@ -305,11 +323,10 @@ print(result)`);
               </div>
 
               {/* Bottom Left: Variables & Timeline */}
-              <div className="border-r border-white/10 flex flex-col">
-                <div className="flex-1 overflow-hidden">
-                  <VariableTable
+              <div className="border-r border-white/10 flex flex-col overflow-hidden">
+                <div className="flex-1 overflow-auto">
+                  <VisualizerDispatcher
                     variables={tracePlayerRef.current?.current()?.variables || {}}
-                    changedKeys={tracePlayerRef.current?.getChangedVariables() || []}
                   />
                 </div>
                 <TimelineControls
@@ -325,9 +342,12 @@ print(result)`);
                 />
               </div>
 
-              {/* Bottom Right: Placeholder */}
-              <div className="bg-black/20 flex items-center justify-center">
-                <span className="text-gray-500 text-sm">Panel 4</span>
+              {/* Bottom Right: AI Analysis */}
+              <div className="overflow-auto">
+                <AIAnalysisPanel
+                  structures={execution?.ai_analysis?.structures}
+                  summary={execution?.ai_analysis?.summary}
+                />
               </div>
             </div>
 

@@ -12,6 +12,7 @@
     "@auth0/nextjs-auth0": "^4.15.0",
     "@elevenlabs/react": "^0.14.1",
     "@monaco-editor/react": "^4.7.0",
+    "@xyflow/react": "^12.10.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.34.3",

@@ -58,13 +58,56 @@ def tracer(frame, event, arg):
         # Normalise to user-code line numbers (user line 1 == USER_CODE_START)
         user_lineno = lineno - USER_CODE_START + 1
 
+        # ─── HELPER: Recursive Serializer ─────────────────────────────────────
+        def serialize(obj, depth=0, max_depth=3):
+            if depth > max_depth:
+                return "..."
+            
+            # Primitives
+            if obj is None or isinstance(obj, (int, float, str, bool)):
+                return obj
+            
+            # 1. Sets (Serialize as sorted list with type tag)
+            if isinstance(obj, set):
+                return {
+                    "__type__": "set",
+                    "items": [serialize(x, depth + 1) for x in sorted(list(obj), key=str)]
+                }
+
+            # 2. Deques (Queue support)
+            if type(obj).__name__ == "deque":
+                return {
+                    "__type__": "deque",
+                    "items": [serialize(x, depth + 1) for x in list(obj)]
+                }
+            
+            # Lists/Tuples
+            if isinstance(obj, (list, tuple)):
+                return [serialize(x, depth + 1) for x in obj]
+            
+            # Dictionaries
+            if isinstance(obj, dict):
+                return {k: serialize(v, depth + 1) for k, v in obj.items()}
+            
+            # Objects (The Magic Part)
+            if hasattr(obj, "__dict__"):
+                return {
+                    "__type__": type(obj).__name__,
+                    "__id__": str(id(obj)), # Good for graph linking later
+                    **{k: serialize(v, depth + 1) for k, v in vars(obj).items() if not k.startswith('_')}
+                }
+            
+            return repr(obj)
+
+        # ─── Capture Variables ────────────────────────────────────────────────
         local_vars = {}
         for k, v in frame.f_locals.items():
             if k in _HARNESS_VARS or k.startswith("__"):
-                continue  # skip harness internals and dunder names
+                continue
+            
             try:
-                json.dumps(v)
-                local_vars[k] = v
+                # Use the new serializer instead of json.dumps/repr
+                local_vars[k] = serialize(v)
             except Exception:
                 local_vars[k] = repr(v)
 

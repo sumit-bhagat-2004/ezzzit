@@ -1,9 +1,19 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+import logging
+from dotenv import load_dotenv
 
-from models.request_models import CodeRequest, ExecuteResponse, TraceStep
+# Load environment variables
+load_dotenv()
+
+from models.request_models import CodeRequest, ExecuteResponse, TraceStep, AIAnalysis
 from services.injector import inject_python_tracer, extract_trace
 from services.judge0_client import send_to_judge0, decode_judge0_field
+from services.gemini_service import get_gemini_service
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="ezzzit – Code Trace API",
@@ -76,9 +86,30 @@ def execute_code(req: CodeRequest):
     if stderr:
         program_output = (program_output + "\n[stderr]\n" + stderr).strip()
 
+    # 5️⃣  Get AI analysis from Gemini (non-blocking - returns None on failure)
+    ai_analysis = None
+    if trace_steps:  # Only analyze if we have trace data
+        try:
+            logger.info("Starting Gemini analysis...")
+            gemini_service = get_gemini_service()
+            ai_result = gemini_service.analyze_execution(
+                code=req.code,
+                language=req.language,
+                trace_data=trace_steps,
+                output=program_output
+            )
+            if ai_result:
+                ai_analysis = AIAnalysis(**ai_result)
+                logger.info("Gemini analysis completed successfully")
+        except Exception as e:
+            logger.error(f"Gemini analysis failed: {e}")
+            # Don't fail the whole request if AI fails
+            pass
+
     return ExecuteResponse(
         output=program_output,
         trace=[TraceStep(**step) for step in trace_steps],
         steps=len(trace_steps),
         exception=exception_text,
+        ai_analysis=ai_analysis,
     )
