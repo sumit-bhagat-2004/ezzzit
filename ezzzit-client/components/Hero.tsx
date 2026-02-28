@@ -1,9 +1,15 @@
+"use client";
+
+import { useUser } from "@auth0/nextjs-auth0";
 import { motion } from "framer-motion";
 import { Play, Mic, Sparkles, ChevronRight } from "lucide-react";
+import Link from "next/link";
 
 const Hero = () => {
+  const { user } = useUser();
+
   return (
-    <div className="relative min-h-screen bg-[#030712] flex items-center pt-10 overflow-hidden">
+    <div className="relative min-h-[calc(100vh-5rem)] bg-[#030712] flex items-center py-8 overflow-hidden">
       {/* Background Radial Glows */}
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-600/20 rounded-full blur-[120px]" />
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-600/10 rounded-full blur-[120px]" />
@@ -35,7 +41,13 @@ const Hero = () => {
 
           <div className="flex flex-wrap gap-4">
             <button className="flex items-center gap-2 px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(79,70,229,0.4)]">
-              Start Visualizing <ChevronRight size={18} />
+              <Link
+                href={user ? "/editor" : "/auth/login"}
+                className="flex items-center gap-2"
+              >
+                Start Visualizing
+              </Link>
+              <ChevronRight size={18} />
             </button>
             <button className="flex items-center gap-2 px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl border border-white/10 transition-all">
               <Play size={18} className="fill-current" /> Watch Demo
