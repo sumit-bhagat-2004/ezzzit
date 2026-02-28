@@ -17,18 +17,16 @@ SNOWFLAKE_WAREHOUSE = os.getenv("SNOWFLAKE_WAREHOUSE", "SSE_WH")
 SNOWFLAKE_DATABASE = os.getenv("SNOWFLAKE_DATABASE", "SSE_DB")
 SNOWFLAKE_SCHEMA = os.getenv("SNOWFLAKE_SCHEMA", "RAG_SCHEMA")
 
-# Embedding model configuration
 EMBEDDING_MODEL = "snowflake-arctic-embed-m"
 EMBEDDING_DIMENSION = 768
 
 # Chunking parameters
-CHUNK_SIZE = 400  # words
-CHUNK_OVERLAP = 50  # words
+CHUNK_SIZE = 200
+CHUNK_OVERLAP = 40
 
 # Retrieval parameters
 TOP_K_RESULTS = 3
 
-# Validate required environment variables
 def validate_config():
     """Validate that all required environment variables are set."""
     required_vars = [
