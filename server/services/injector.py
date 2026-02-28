@@ -18,15 +18,20 @@ def inject_python_tracer(user_code: str) -> str:
     Wraps *user_code* with the sys.settrace harness so that every line
     executed is recorded into TRACE_DATA.
 
-    The final output on stdout will look like:
+    Strategy
+    --------
+    1. Read the tracer template (defines globals + tracer fn, no settrace call).
+    2. Compute exactly which absolute line numbers user code occupies in the
+       assembled script by measuring the prefix with placeholder values
+       (same line count, different chars – splitlines is length-safe).
+    3. Inject USER_CODE_START / USER_CODE_END, THEN activate sys.settrace and
+       set f_trace on the current frame so module-level code is also traced.
+
+    The final stdout will look like:
         <program output>
         __TRACE_START__
         [{ ...trace steps... }]
         __TRACE_END__
-
-    If the user code raises an exception:
-        __TRACE_EXCEPTION__
-        <traceback>
     """
     if len(user_code.splitlines()) > MAX_CODE_LINES:
         raise ValueError(
@@ -36,21 +41,56 @@ def inject_python_tracer(user_code: str) -> str:
 
     tracer_src = _TRACER_PATH.read_text(encoding="utf-8")
 
-    injected = f"""{tracer_src}
+    # ── Step 1: measure prefix length with placeholder values ─────────────────
+    # Using single-digit placeholders keeps the line count identical to the
+    # real version (splitlines counts newlines, not character width).
+    _prefix_probe = (
+        tracer_src
+        + "\n"
+        + "USER_CODE_START = 0\n"
+        + "USER_CODE_END = 0\n"
+        + "\n"
+        + "sys.settrace(tracer)\n"
+        + "sys._getframe().f_trace = tracer\n"
+        + "\n"
+        + "# ─── User code ──────────────────────────────────────────────────────────────\n"
+        + "try:\n"
+    )
+    user_code_start = len(_prefix_probe.splitlines()) + 1  # 1-based; user code is the NEXT line
+    user_code_end = user_code_start + len(user_code.splitlines()) - 1
 
-# ─── User code ───────────────────────────────────────────────────────────────
-try:
-{_indent(user_code)}
-except Exception as _exc:
-    import traceback as _tb
-    print("__TRACE_EXCEPTION__")
-    print(_tb.format_exc())
-finally:
-    sys.settrace(None)
-    print("__TRACE_START__")
-    print(json.dumps(TRACE_DATA))
-    print("__TRACE_END__")
-"""
+    # ── Step 2: build the real prefix with computed line numbers ──────────────
+    prefix = (
+        tracer_src
+        + "\n"
+        + f"USER_CODE_START = {user_code_start}\n"
+        + f"USER_CODE_END = {user_code_end}\n"
+        + "\n"
+        + "sys.settrace(tracer)\n"
+        + "sys._getframe().f_trace = tracer  # enables tracing for module-level code\n"
+        + "\n"
+        + "# ─── User code ──────────────────────────────────────────────────────────────\n"
+        + "try:\n"
+    )
+
+    # ── Step 3: assemble full script ──────────────────────────────────────────
+    injected = (
+        prefix
+        + _indent(user_code) + "\n"
+        + "except Exception as _exc:\n"
+        + "    import traceback as _tb\n"
+        + '    print("__TRACE_EXCEPTION__")\n'
+        + "    print(_tb.format_exc())\n"
+        + "finally:\n"
+        + "    sys.settrace(None)\n"
+        + '    print("__TRACE_START__")\n'
+        + "    try:\n"
+        + "        print(json.dumps(TRACE_DATA))\n"
+        + "    except Exception:\n"
+        + '        print("[]")\n'
+        + '    print("__TRACE_END__")\n'
+    )
+
     return injected
 
 
