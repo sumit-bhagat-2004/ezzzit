@@ -3,24 +3,29 @@
 import { useState } from "react";
 import { Menu, X, Zap } from "lucide-react";
 import { useUser } from "@auth0/nextjs-auth0";
+import Image from "next/image";
+import Link from "next/link";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { user } = useUser();
 
   return (
-    <nav className="fixed top-0 w-full z-[100] bg-[#030712]/50 backdrop-blur-xl border-b border-white/5">
+    <nav className="fixed top-0 w-full z-[100] bg-[#030712] backdrop-blur-xl border-b border-white/5">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-20 items-center">
           {/* Logo Section */}
-          <div className="flex items-center gap-2.5 group cursor-pointer">
+          <Link
+            href="/"
+            className="flex items-center gap-2.5 group cursor-pointer"
+          >
             <div className="bg-indigo-600 p-1.5 rounded-lg shadow-[0_0_15px_rgba(79,70,229,0.4)] group-hover:scale-110 transition-transform">
               <Zap size={20} className="text-white fill-white" />
             </div>
             <span className="text-2xl font-bold tracking-tighter text-white">
               ezzzit
             </span>
-          </div>
+          </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-10">
@@ -40,12 +45,21 @@ const Navbar = () => {
             <div className="h-5 w-px bg-white/10 mx-2"></div>
 
             {user ? (
-              <a
-                href="/auth/logout"
-                className="text-sm font-semibold text-gray-300 hover:text-white transition-colors"
-              >
-                Logout
-              </a>
+              <>
+                <a
+                  href="/auth/logout"
+                  className="text-sm font-semibold text-gray-300 hover:text-white transition-colors"
+                >
+                  Logout
+                </a>
+                <Image
+                  src={user?.picture || "/default-profile.png"}
+                  width={32}
+                  height={32}
+                  className="rounded-full ml-2"
+                  alt="User Profile Picture"
+                />
+              </>
             ) : (
               <a
                 href="/auth/login"
