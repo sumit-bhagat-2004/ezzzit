@@ -4,7 +4,7 @@ Exposes retrieval endpoint for semantic knowledge search.
 """
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import List, Dict, Any
 import logging
 
@@ -130,13 +130,25 @@ class TraceExplainRequest(BaseModel):
     code: str
     language: str = "python"
     stdin: str = ""
+    level: str = "medium"
+    
+    @field_validator('level')
+    @classmethod
+    def validate_level(cls, v: str) -> str:
+        """Validate and normalize the level parameter."""
+        normalized = v.lower()
+        valid_levels = ["beginner", "medium", "interview_ready"]
+        if normalized not in valid_levels:
+            raise ValueError(f"Level must be one of {valid_levels}, got '{v}'")
+        return normalized
     
     class Config:
         json_schema_extra = {
             "example": {
                 "code": "a = 5\nb = 3\nsum_val = a + b\nprint(sum_val)",
                 "language": "python",
-                "stdin": ""
+                "stdin": "",
+                "level": "medium"
             }
         }
 
@@ -542,11 +554,11 @@ async def explain_trace(request: TraceExplainRequest):
         
         logger.info(f"Processing {len(raw_trace)} trace steps")
         
-        # Step 2-6: Generate explanations using StepExplainer
-        explainer = StepExplainer(top_k_knowledge=3)
+        # Step 2-6: Generate explanations using StepExplainer with level
+        explainer = StepExplainer(top_k_knowledge=3, level=request.level)
         enriched_steps = explainer.generate_step_explanations(request.code, raw_trace)
         
-        logger.info(f"Generated {len(enriched_steps)} enriched trace steps")
+        logger.info(f"Generated {len(enriched_steps)} enriched trace steps at {request.level} level")
         
         # Convert to response model
         trace_steps = [
@@ -586,7 +598,7 @@ async def root():
             "retrieve": "/rag/retrieve",
             "retrieve_clean": "/rag/retrieve/clean",
             "explain": "/rag/explain (step-by-step explanations)",
-            "explain_trace": "/rag/explain_trace (NEW: trace-aware explanations)",
+            "explain_trace": "/rag/explain_trace (trace-aware explanations with levels)",
             "retrieve_detailed": "/rag/retrieve/detailed",
             "docs": "/docs"
         },
@@ -594,5 +606,10 @@ async def root():
             "quick_facts": "Use /rag/retrieve/clean",
             "learning": "Use /rag/explain for step-by-step",
             "code_execution": "Use /rag/explain_trace for execution traces"
+        },
+        "explain_trace_levels": {
+            "beginner": "Easiest explanations for learning programming",
+            "medium": "Standard explanations (default)",
+            "interview_ready": "Technical explanations for interview prep"
         }
     }
