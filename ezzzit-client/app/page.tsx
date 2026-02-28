@@ -1,26 +1,17 @@
-import { auth0 } from "@/lib/auth0";
+"use client";
+import Features from "@/components/Features";
+import Hero from "@/components/Hero";
+import { useUser } from "@auth0/nextjs-auth0";
 
-export default async function Home() {
-  const session = await auth0.getSession();
+export default function Home() {
+  const { user, error, isLoading } = useUser();
 
-  if (!session) {
-    return (
-      <>
-        <a href="/auth/login?screen_hint=signup">Signup</a>
-        <br />
-        <a href="/auth/login">Login</a>
-      </>
-    );
-  }
+  if (isLoading) return <div>Loading...</div>;
 
   return (
-    <>
-      <p>Logged in as {session.user.email}</p>
-
-      <h1>User Profile</h1>
-      <pre>{JSON.stringify(session.user, null, 2)}</pre>
-
-      <a href="/auth/logout">Logout</a>
-    </>
+    <div>
+      <Hero />
+      <Features />
+    </div>
   );
 }
