@@ -31,7 +31,7 @@ export default function RootLayout({
       >
         <Auth0Provider>
           <Navbar />
-          {children}
+          <main className="pt-20">{children}</main>
         </Auth0Provider>
       </body>
     </html>
