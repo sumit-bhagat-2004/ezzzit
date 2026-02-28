@@ -5,13 +5,15 @@ Exposes retrieval endpoint for semantic knowledge search.
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import List
+from typing import List, Dict, Any
 import logging
 
 import config
 from retrieval.retriever import retrieve, retrieve_with_metadata, clean_content, extract_key_sentences, retrieve_by_concept
 from db.snowflake_conn import get_connection, close_connection
 import re
+import httpx
+from explainer.step_explainer import StepExplainer
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -120,6 +122,64 @@ class HealthResponse(BaseModel):
     """Health check response."""
     status: str
     message: str
+
+
+# Trace Explanation Models
+class TraceExplainRequest(BaseModel):
+    """Request model for trace-based explanation."""
+    code: str
+    language: str = "python"
+    stdin: str = ""
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "code": "a = 5\nb = 3\nsum_val = a + b\nprint(sum_val)",
+                "language": "python",
+                "stdin": ""
+            }
+        }
+
+
+class EnrichedTraceStep(BaseModel):
+    """Single enriched trace step with explanation."""
+    step: int
+    line: int
+    variables: Dict[str, Any]
+    explanation: str
+
+
+class TraceExplainResponse(BaseModel):
+    """Response model for trace explanation."""
+    output: str
+    trace: List[EnrichedTraceStep]
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "output": "8",
+                "trace": [
+                    {
+                        "step": 1,
+                        "line": 1,
+                        "variables": {"a": 5},
+                        "explanation": "Variable `a` is created with value `5`."
+                    },
+                    {
+                        "step": 2,
+                        "line": 2,
+                        "variables": {"a": 5, "b": 3},
+                        "explanation": "Variable `b` is created with value `3`."
+                    },
+                    {
+                        "step": 3,
+                        "line": 3,
+                        "variables": {"a": 5, "b": 3, "sum_val": 8},
+                        "explanation": "Executing line 3: `sum_val = a + b`. Variable `sum_val` is created with value `8`. Variables a and b are added to compute sum_val."
+                    }
+                ]
+            }
+        }
 
 
 # Startup event
@@ -415,6 +475,105 @@ async def explain_topic(request: RetrievalRequest):
         raise HTTPException(status_code=500, detail=f"Explanation failed: {str(e)}")
 
 
+# Trace-aware explanation endpoint (NEW)
+@app.post("/rag/explain_trace", response_model=TraceExplainResponse)
+async def explain_trace(request: TraceExplainRequest):
+    """
+    Generate step-by-step explanations for execution traces.
+    
+    This endpoint:
+    1. Calls external execution API to get trace
+    2. Processes trace and computes state differences
+    3. Extracts runtime concepts
+    4. Retrieves relevant knowledge from Snowflake
+    5. Generates grounded explanations for each step
+    
+    Args:
+        request: TraceExplainRequest with code, language, and stdin
+    
+    Returns:
+        TraceExplainResponse with output and enriched trace
+    """
+    try:
+        logger.info(f"Received trace explanation request for {len(request.code)} chars of {request.language} code")
+        
+        # Validate input
+        if not request.code or not request.code.strip():
+            raise HTTPException(status_code=400, detail="Code cannot be empty")
+        
+        if request.language.lower() != "python":
+            raise HTTPException(status_code=400, detail="Currently only Python is supported")
+        
+        # Step 1: Call external execution API
+        execution_api_url = f"{config.EXECUTION_API_URL}/execute"
+        
+        execution_payload = {
+            "code": request.code,
+            "language": request.language,
+            "stdin": request.stdin
+        }
+        
+        logger.info(f"Calling execution API at {execution_api_url}")
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            execution_response = await client.post(execution_api_url, json=execution_payload)
+        
+        if execution_response.status_code != 200:
+            logger.error(f"Execution API error: {execution_response.status_code}")
+            raise HTTPException(
+                status_code=502, 
+                detail=f"Execution API failed with status {execution_response.status_code}"
+            )
+        
+        execution_data = execution_response.json()
+        logger.info(f"Received execution response with trace")
+        
+        # Extract output and trace
+        output = execution_data.get("output", "")
+        raw_trace = execution_data.get("trace", [])
+        
+        if not raw_trace:
+            logger.warning("Empty trace received from execution API")
+            # Return minimal response
+            return TraceExplainResponse(
+                output=output,
+                trace=[]
+            )
+        
+        logger.info(f"Processing {len(raw_trace)} trace steps")
+        
+        # Step 2-6: Generate explanations using StepExplainer
+        explainer = StepExplainer(top_k_knowledge=3)
+        enriched_steps = explainer.generate_step_explanations(request.code, raw_trace)
+        
+        logger.info(f"Generated {len(enriched_steps)} enriched trace steps")
+        
+        # Convert to response model
+        trace_steps = [
+            EnrichedTraceStep(**step) for step in enriched_steps
+        ]
+        
+        return TraceExplainResponse(
+            output=output,
+            trace=trace_steps
+        )
+    
+    except HTTPException:
+        raise
+    
+    except httpx.TimeoutException:
+        logger.error("Execution API timeout")
+        raise HTTPException(status_code=504, detail="Execution API timeout")
+    
+    except httpx.RequestError as e:
+        logger.error(f"Execution API connection error: {e}")
+        raise HTTPException(status_code=502, detail=f"Cannot connect to execution API: {str(e)}")
+    
+    except Exception as e:
+        logger.error(f"Trace explanation error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Trace explanation failed: {str(e)}")
+
+
 # Root endpoint
 @app.get("/")
 async def root():
@@ -427,11 +586,13 @@ async def root():
             "retrieve": "/rag/retrieve",
             "retrieve_clean": "/rag/retrieve/clean",
             "explain": "/rag/explain (step-by-step explanations)",
+            "explain_trace": "/rag/explain_trace (NEW: trace-aware explanations)",
             "retrieve_detailed": "/rag/retrieve/detailed",
             "docs": "/docs"
         },
         "recommendations": {
             "quick_facts": "Use /rag/retrieve/clean",
-            "learning": "Use /rag/explain for step-by-step"
+            "learning": "Use /rag/explain for step-by-step",
+            "code_execution": "Use /rag/explain_trace for execution traces"
         }
     }

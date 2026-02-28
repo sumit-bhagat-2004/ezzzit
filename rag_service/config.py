@@ -13,9 +13,9 @@ load_dotenv()
 SNOWFLAKE_USER = os.getenv("SNOWFLAKE_USER")
 SNOWFLAKE_PASSWORD = os.getenv("SNOWFLAKE_PASSWORD")
 SNOWFLAKE_ACCOUNT = os.getenv("SNOWFLAKE_ACCOUNT")
-SNOWFLAKE_WAREHOUSE = os.getenv("SNOWFLAKE_WAREHOUSE", "SSE_WH")
-SNOWFLAKE_DATABASE = os.getenv("SNOWFLAKE_DATABASE", "SSE_DB")
-SNOWFLAKE_SCHEMA = os.getenv("SNOWFLAKE_SCHEMA", "RAG_SCHEMA")
+SNOWFLAKE_WAREHOUSE = os.getenv("SNOWFLAKE_WAREHOUSE")
+SNOWFLAKE_DATABASE = os.getenv("SNOWFLAKE_DATABASE")
+SNOWFLAKE_SCHEMA = os.getenv("SNOWFLAKE_SCHEMA")
 
 EMBEDDING_MODEL = "snowflake-arctic-embed-m"
 EMBEDDING_DIMENSION = 768
@@ -26,6 +26,9 @@ CHUNK_OVERLAP = 40
 
 # Retrieval parameters
 TOP_K_RESULTS = 3
+
+# Execution API parameters
+EXECUTION_API_URL = os.getenv("EXECUTION_API_URL")
 
 def validate_config():
     """Validate that all required environment variables are set."""
