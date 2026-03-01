@@ -6,25 +6,31 @@ interface TimelineControlsProps {
   currentStep: number;
   totalSteps: number;
   isPlaying: boolean;
+  playbackSpeed: number;
   onPlay: () => void;
   onPause: () => void;
   onNext: () => void;
   onPrev: () => void;
   onReset: () => void;
   onSliderChange: (step: number) => void;
+  onSpeedChange: (speed: number) => void;
 }
 
 export default function TimelineControls({
   currentStep,
   totalSteps,
   isPlaying,
+  playbackSpeed,
   onPlay,
   onPause,
   onNext,
   onPrev,
   onReset,
   onSliderChange,
+  onSpeedChange,
 }: TimelineControlsProps) {
+  const speedOptions = [0.25, 0.5, 1, 1.5, 2];
+
   return (
     <div className="p-2 space-y-2 bg-black/20 border-t border-white/10">
       {/* Step Info */}
@@ -32,6 +38,21 @@ export default function TimelineControls({
         <span className="text-indigo-400 font-semibold">
           Step {currentStep + 1} of {totalSteps}
         </span>
+        {/* Speed Control */}
+        <div className="flex items-center gap-2">
+          <span className="text-gray-400 text-[10px]">Speed:</span>
+          <select
+            value={playbackSpeed}
+            onChange={(e) => onSpeedChange(parseFloat(e.target.value))}
+            className="px-2 py-0.5 text-[10px] rounded bg-white/5 text-white border border-white/10 hover:bg-white/10 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition cursor-pointer"
+          >
+            {speedOptions.map((speed) => (
+              <option key={speed} value={speed} className="bg-gray-900">
+                {speed}x
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Timeline Slider */}
