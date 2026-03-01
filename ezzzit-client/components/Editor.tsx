@@ -67,6 +67,7 @@ print(result)`);
   const [currentLine, setCurrentLine] = useState<number | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1); // 0.25x, 0.5x, 1x, 1.5x, 2x
   const [editorMode, setEditorMode] = useState<"edit" | "trace">("edit");
   const tracePlayerRef = useRef<TracePlayer | null>(null);
   const playIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -81,9 +82,20 @@ print(result)`);
     };
   }, []);
 
+  // Restart playback with new speed when speed changes during play
+  useEffect(() => {
+    if (isPlaying && playIntervalRef.current) {
+      handlePause();
+      handlePlay();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playbackSpeed]);
+
   const handlePlay = () => {
     if (!tracePlayerRef.current) return;
     setIsPlaying(true);
+    // Calculate delay based on speed (base delay is 1200ms at 1x speed)
+    const delay = 1200 / playbackSpeed;
     playIntervalRef.current = setInterval(() => {
       const player = tracePlayerRef.current;
       if (!player) return;
@@ -101,7 +113,7 @@ print(result)`);
           playIntervalRef.current = null;
         }
       }
-    }, 1200);
+    }, delay);
   };
 
   const handlePause = () => {
@@ -560,12 +572,14 @@ print(result)`);
                       currentStep={currentStepIndex}
                       totalSteps={tracePlayerRef.current?.total() || 0}
                       isPlaying={isPlaying}
+                      playbackSpeed={playbackSpeed}
                       onPlay={handlePlay}
                       onPause={handlePause}
                       onNext={handleNext}
                       onPrev={handlePrev}
                       onReset={handleReset}
                       onSliderChange={handleSliderChange}
+                      onSpeedChange={setPlaybackSpeed}
                     />
                   </div>
 
