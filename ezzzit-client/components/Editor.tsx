@@ -67,6 +67,7 @@ print(result)`);
   const [currentLine, setCurrentLine] = useState<number | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [editorMode, setEditorMode] = useState<'edit' | 'trace'>('edit');
   const tracePlayerRef = useRef<TracePlayer | null>(null);
   const playIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -367,75 +368,72 @@ print(result)`);
                     </button>
                   </div>
                 </div>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="execution"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex-1 flex gap-0 overflow-hidden"
-              >
-                {/* Left: 4-panel grid */}
-                <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-0 h-full">
-                  {/* Top Left: Original Editor */}
-                  <div className="border-r border-b border-white/10 overflow-hidden flex flex-col">
-                    <div className="px-3 py-2 bg-black/30 border-b border-white/10"></div>
-                    <div className="flex-1">
-                      <Editor
-                        height="100%"
-                        theme="vs-dark"
-                        language={language}
-                        value={code}
-                        onChange={(value) => setCode(value || "")}
-                        options={{
-                          fontSize: 13,
-                          minimap: { enabled: false },
-                          automaticLayout: true,
-                          scrollBeyondLastLine: false,
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Top Right: Execution View */}
-                  <div className="border-b border-white/10 overflow-hidden">
-                    <ExecutionView
-                      code={code}
-                      language={language}
-                      currentLine={currentLine}
-                    />
-                  </div>
-
-                  {/* Bottom Left: Variables & Timeline */}
-                  <div className="border-r border-white/10 flex flex-col overflow-hidden">
-                    <div className="flex-1 overflow-auto">
-                      <VisualizerDispatcher
-                        variables={
-                          tracePlayerRef.current?.current()?.variables || {}
-                        }
-                      />
-                    </div>
-                    <TimelineControls
-                      currentStep={currentStepIndex}
-                      totalSteps={tracePlayerRef.current?.total() || 0}
-                      isPlaying={isPlaying}
-                      onPlay={handlePlay}
-                      onPause={handlePause}
-                      onNext={handleNext}
-                      onPrev={handlePrev}
-                      onReset={handleReset}
-                      onSliderChange={handleSliderChange}
-                    />
-                  </div>
-
-                  {/* Bottom Right: AI Analysis */}
-                  <div className="overflow-auto">
-                    <AIAnalysisPanel
-                      structures={execution?.ai_analysis?.structures}
-                      summary={execution?.ai_analysis?.summary}
-                    />
-                  </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="execution"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex-1 flex gap-0 overflow-hidden"
+          >
+            {/* Left: 4-panel grid */}
+            <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-0 h-full">
+              {/* Top Left: Original Editor */}
+              <div className="border-r border-b border-white/10 overflow-hidden">
+                <div className="h-full">
+                  <Editor
+                    height="100%"
+                    theme="vs-dark"
+                    language={language}
+                    value={code}
+                    onChange={(value) => setCode(value || "")}
+                    options={{
+                      fontSize: 13,
+                      minimap: { enabled: false },
+                      automaticLayout: true,
+                      scrollBeyondLastLine: false,
+                    }}
+                  />
                 </div>
+              </div>
+
+              {/* Top Right: Execution View */}
+              <div className="border-b border-white/10 overflow-hidden">
+                <ExecutionView
+                  code={code}
+                  language={language}
+                  currentLine={currentLine}
+                />
+              </div>
+
+              {/* Bottom Left: Variables & Timeline */}
+              <div className="border-r border-white/10 flex flex-col overflow-hidden">
+                <div className="flex-1 overflow-auto">
+                  <VisualizerDispatcher
+                    variables={tracePlayerRef.current?.current()?.variables || {}}
+                  />
+                </div>
+                <TimelineControls
+                  currentStep={currentStepIndex}
+                  totalSteps={tracePlayerRef.current?.total() || 0}
+                  isPlaying={isPlaying}
+                  onPlay={handlePlay}
+                  onPause={handlePause}
+                  onNext={handleNext}
+                  onPrev={handlePrev}
+                  onReset={handleReset}
+                  onSliderChange={handleSliderChange}
+                />
+              </div>
+
+              {/* Bottom Right: AI Analysis */}
+              <div className="overflow-auto">
+                <AIAnalysisPanel
+                  structures={execution?.ai_analysis?.structures}
+                  summary={execution?.ai_analysis?.summary}
+                />
+              </div>
+            </div>
 
                 {/* Right: Output and Controls */}
                 <div className="w-96 border-l border-white/10 flex flex-col">

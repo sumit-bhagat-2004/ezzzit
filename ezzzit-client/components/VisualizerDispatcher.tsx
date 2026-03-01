@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useRef } from "react";
 import { detectType } from "@/lib/dataTypeDetector";
 import ArrayVisualizer from "./visualizers/ArrayVisualizer";
 import MatrixVisualizer from "./visualizers/MatrixVisualizer";
@@ -10,9 +11,48 @@ import MapVisualizer from "./visualizers/MapVisualizer";
 
 interface Props {
   variables: Record<string, unknown>;
+  changedVariables?: string[];
+  showOnlyVisualizers?: boolean;
 }
 
-export default function VisualizerDispatcher({ variables }: Props) {
+export default function VisualizerDispatcher({ variables, changedVariables, showOnlyVisualizers = false }: Props) {
+  const variableRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const previousVariablesRef = useRef<Record<string, unknown>>({});
+  
+  // Convert array to Set for efficient lookups
+  const changedSet = changedVariables ? new Set(changedVariables) : new Set<string>();
+
+  // Auto-scroll to changed variables
+  useEffect(() => {
+    if (!changedVariables || changedVariables.length === 0) return;
+
+    // Find the last changed variable that has a visualizer (scroll to bottom-most change)
+    const changedVisualizerVars = changedVariables.filter(
+      varName => detectType(variables[varName], varName) !== 'VALUE'
+    );
+
+    if (changedVisualizerVars.length > 0) {
+      // Get the last changed variable to scroll down
+      const targetVar = changedVisualizerVars[changedVisualizerVars.length - 1];
+      
+      // Use setTimeout to ensure DOM is fully updated
+      setTimeout(() => {
+        const element = variableRefs.current[targetVar];
+        
+        if (element) {
+          element.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest',
+            inline: 'nearest'
+          });
+        }
+      }, 100);
+    }
+
+    previousVariablesRef.current = { ...variables };
+  }, [changedVariables, variables]);
+
   // 1. Identify "Pointer" variables (integers usually named i, j, k, low, high)
   const pointers: Record<string, number> = {};
   Object.entries(variables).forEach(([k, v]) => {
@@ -22,7 +62,7 @@ export default function VisualizerDispatcher({ variables }: Props) {
   });
 
   return (
-    <div className="flex flex-col gap-8 p-4 h-full overflow-y-auto">
+    <div ref={containerRef} className="flex flex-col gap-8 p-4 h-full overflow-y-auto">
       {Object.entries(variables).map(([name, value]) => {
         // Pass the variable name to detectType for heuristics
         const type = detectType(value, name);
@@ -30,10 +70,18 @@ export default function VisualizerDispatcher({ variables }: Props) {
         // Skip primitives in the "Big View" (keep them in a small sidebar table if you want)
         if (type === 'VALUE') return null; 
 
+        const isChanged = changedSet.has(name);
+
         return (
-          <div key={name} className="flex flex-col gap-2 animate-in fade-in duration-300">
+          <div 
+            key={name} 
+            ref={(el) => { variableRefs.current[name] = el; }}
+            className={`flex flex-col gap-2 animate-in fade-in duration-300 ${
+              isChanged ? 'ring-2 ring-indigo-500/50 rounded-xl' : ''
+            }`}
+          >
              <div className="flex justify-between items-center text-xs uppercase text-gray-400 font-bold tracking-wider">
-               <span>{name}</span>
+               <span className={isChanged ? 'text-indigo-400' : ''}>{name}</span>
                <span className="bg-gray-800 px-2 py-0.5 rounded text-indigo-400 text-[10px]">{type}</span>
              </div>
              
@@ -51,22 +99,24 @@ export default function VisualizerDispatcher({ variables }: Props) {
         );
       })}
       
-      {/* Fallback Table for Primitives */}
-      <div className="mt-4">
-        <h3 className="text-xs uppercase text-gray-500 font-semibold mb-2">Primitive Scope</h3>
-        <table className="w-full text-sm text-left text-gray-400">
-            <tbody>
-            {Object.entries(variables).map(([k, v]) => 
-                detectType(v, k) === 'VALUE' ? (
-                <tr key={k} className="border-b border-white/5">
-                    <td className="py-1 font-mono text-indigo-300">{k}</td>
-                    <td className="py-1 font-mono">{String(v)}</td>
-                </tr>
-                ) : null
-            )}
-            </tbody>
-        </table>
-      </div>
+      {/* Fallback Table for Primitives - only show if not in visualizer-only mode */}
+      {!showOnlyVisualizers && (
+        <div className="mt-4">
+          <h3 className="text-xs uppercase text-gray-500 font-semibold mb-2">Primitive Scope</h3>
+          <table className="w-full text-sm text-left text-gray-400">
+              <tbody>
+              {Object.entries(variables).map(([k, v]) => 
+                  detectType(v, k) === 'VALUE' ? (
+                  <tr key={k} className="border-b border-white/5">
+                      <td className="py-1 font-mono text-indigo-300">{k}</td>
+                      <td className="py-1 font-mono">{String(v)}</td>
+                  </tr>
+                  ) : null
+              )}
+              </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

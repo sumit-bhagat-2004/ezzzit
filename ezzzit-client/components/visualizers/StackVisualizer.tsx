@@ -11,7 +11,7 @@ export default function StackVisualizer({ data }: { data: any[] }) {
       <div className="text-xs text-gray-500 mb-2 font-mono uppercase tracking-widest">Top</div>
       
       {/* The Stack Container */}
-      <div className="flex flex-col-reverse w-24 border-b-4 border-l-4 border-r-4 border-gray-600 rounded-b-xl p-2 bg-gray-900/50 gap-2 min-h-[150px] justify-end">
+      <div className="flex flex-col w-24 border-b-4 border-l-4 border-r-4 border-gray-600 rounded-b-xl p-2 bg-gray-900/50 gap-2 min-h-[150px]">
         <AnimatePresence>
           {reversedData.map((val, idx) => (
             <motion.div
