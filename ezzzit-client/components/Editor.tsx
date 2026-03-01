@@ -378,40 +378,96 @@ print(result)`);
           >
             {/* Left: 4-panel grid */}
             <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-0 h-full">
-              {/* Top Left: Original Editor */}
-              <div className="border-r border-b border-white/10 overflow-hidden">
-                <div className="h-full">
-                  <Editor
-                    height="100%"
-                    theme="vs-dark"
-                    language={language}
-                    value={code}
-                    onChange={(value) => setCode(value || "")}
-                    options={{
-                      fontSize: 13,
-                      minimap: { enabled: false },
-                      automaticLayout: true,
-                      scrollBeyondLastLine: false,
-                    }}
+              {/* Panel 1 (Top Left): Merged Editor with Toggle */}
+              <div className="border-r border-b border-white/10 overflow-hidden flex flex-col">
+                {/* Toggle Header */}
+                <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-black/20">
+                  <h3 className="text-xs font-semibold text-gray-400">Code Editor</h3>
+                  <div className="flex gap-1 bg-black/40 rounded-lg p-1">
+                    <button
+                      onClick={() => setEditorMode('edit')}
+                      className={`px-3 py-1 text-xs rounded transition ${
+                        editorMode === 'edit'
+                          ? 'bg-indigo-600 text-white'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => setEditorMode('trace')}
+                      className={`px-3 py-1 text-xs rounded transition ${
+                        editorMode === 'trace'
+                          ? 'bg-indigo-600 text-white'
+                          : 'text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      Trace
+                    </button>
+                  </div>
+                </div>
+                {/* Editor Content */}
+                <div className="flex-1 overflow-hidden">
+                  {editorMode === 'edit' ? (
+                    <Editor
+                      height="100%"
+                      theme="vs-dark"
+                      language={language}
+                      value={code}
+                      onChange={(value) => setCode(value || "")}
+                      options={{
+                        fontSize: 13,
+                        minimap: { enabled: false },
+                        automaticLayout: true,
+                        scrollBeyondLastLine: false,
+                      }}
+                    />
+                  ) : (
+                    <ExecutionView
+                      code={code}
+                      language={language}
+                      currentLine={currentLine}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Panel 2 (Top Right): Data Structure Visualizations */}
+              <div className="border-b border-white/10 flex flex-col overflow-hidden">
+                <div className="px-3 py-2 border-b border-white/10 bg-black/20">
+                  <h3 className="text-xs font-semibold text-indigo-400">Data Structures</h3>
+                </div>
+                <div className="flex-1 overflow-auto custom-scrollbar">
+                  <VisualizerDispatcher
+                    variables={tracePlayerRef.current?.current()?.variables || {}}
+                    changedVariables={tracePlayerRef.current?.getChangedVariables()}
+                    showOnlyVisualizers={true}
                   />
                 </div>
               </div>
 
-              {/* Top Right: Execution View */}
-              <div className="border-b border-white/10 overflow-hidden">
-                <ExecutionView
-                  code={code}
-                  language={language}
-                  currentLine={currentLine}
-                />
-              </div>
-
-              {/* Bottom Left: Variables & Timeline */}
+              {/* Panel 3 (Bottom Left): Variable Table & Timeline */}
               <div className="border-r border-white/10 flex flex-col overflow-hidden">
-                <div className="flex-1 overflow-auto">
-                  <VisualizerDispatcher
-                    variables={tracePlayerRef.current?.current()?.variables || {}}
-                  />
+                <div className="px-3 py-2 border-b border-white/10 bg-black/20">
+                  <h3 className="text-xs font-semibold text-gray-400">Variables</h3>
+                </div>
+                <div className="flex-1 overflow-auto custom-scrollbar p-4">
+                  <table className="w-full text-sm text-left text-gray-400">
+                    <thead>
+                      <tr className="border-b border-white/10">
+                        <th className="py-2 font-mono text-indigo-300">Name</th>
+                        <th className="py-2 font-mono text-indigo-300">Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(tracePlayerRef.current?.current()?.variables || {}).map(([k, v]) => (
+                        <tr key={k} className="border-b border-white/5">
+                          <td className="py-2 font-mono text-indigo-300">{k}</td>
+                          <td className="py-2 font-mono">{typeof v === 'object' ? JSON.stringify(v) : String(v)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
                 <TimelineControls
                   currentStep={currentStepIndex}
@@ -426,8 +482,8 @@ print(result)`);
                 />
               </div>
 
-              {/* Bottom Right: AI Analysis */}
-              <div className="overflow-auto">
+              {/* Panel 4 (Bottom Right): AI Analysis */}
+              <div className="overflow-auto custom-scrollbar">
                 <AIAnalysisPanel
                   structures={execution?.ai_analysis?.structures}
                   summary={execution?.ai_analysis?.summary}
