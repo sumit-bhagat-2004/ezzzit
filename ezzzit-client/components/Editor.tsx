@@ -101,7 +101,7 @@ print(result)`);
           playIntervalRef.current = null;
         }
       }
-    }, 600);
+    }, 1200);
   };
 
   const handlePause = () => {
