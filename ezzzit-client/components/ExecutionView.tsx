@@ -10,8 +10,14 @@ interface ExecutionViewProps {
   currentLine: number | null;
 }
 
-export default function ExecutionView({ code, language, currentLine }: ExecutionViewProps) {
-  const editorRef = useRef<monacoEditor.editor.IStandaloneCodeEditor | null>(null);
+export default function ExecutionView({
+  code,
+  language,
+  currentLine,
+}: ExecutionViewProps) {
+  const editorRef = useRef<monacoEditor.editor.IStandaloneCodeEditor | null>(
+    null,
+  );
   const decorationsRef = useRef<string[]>([]);
 
   useEffect(() => {
@@ -20,7 +26,10 @@ export default function ExecutionView({ code, language, currentLine }: Execution
     const editor = editorRef.current;
 
     // Clear previous decorations
-    decorationsRef.current = editor.deltaDecorations(decorationsRef.current, []);
+    decorationsRef.current = editor.deltaDecorations(
+      decorationsRef.current,
+      [],
+    );
 
     // Add new decoration for current line
     decorationsRef.current = editor.deltaDecorations(
@@ -39,7 +48,7 @@ export default function ExecutionView({ code, language, currentLine }: Execution
             glyphMarginClassName: "executionLineGlyph",
           },
         },
-      ]
+      ],
     );
 
     // Scroll to current line
@@ -47,7 +56,7 @@ export default function ExecutionView({ code, language, currentLine }: Execution
   }, [currentLine]);
 
   const handleEditorDidMount = (
-    editor: monacoEditor.editor.IStandaloneCodeEditor
+    editor: monacoEditor.editor.IStandaloneCodeEditor,
   ) => {
     editorRef.current = editor;
 
@@ -68,8 +77,8 @@ export default function ExecutionView({ code, language, currentLine }: Execution
   };
 
   return (
-    <div className="h-full relative">
-      <div className="absolute top-0 left-0 right-0 px-3 py-2 bg-black/30 border-b border-white/10 z-10">
+    <div className="h-full flex flex-col">
+      <div className="px-3 py-2 bg-black/30 border-b border-white/10">
         <div className="flex items-center gap-2 text-xs">
           <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
           <span className="text-indigo-400 font-semibold">Execution View</span>
@@ -80,7 +89,7 @@ export default function ExecutionView({ code, language, currentLine }: Execution
           )}
         </div>
       </div>
-      <div className="pt-10 h-full">
+      <div className="flex-1">
         <Editor
           height="100%"
           theme="vs-dark"

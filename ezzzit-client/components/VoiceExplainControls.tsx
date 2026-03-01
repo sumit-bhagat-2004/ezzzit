@@ -25,12 +25,14 @@ type VoiceExplainControlsProps = {
   execution: ExecutionResponse | null;
   code: string;
   stdin: string;
+  level: string;
 };
 
 export default function VoiceExplainControls({
   execution,
   code,
   stdin,
+  level,
 }: VoiceExplainControlsProps) {
   const [voiceLoading, setVoiceLoading] = useState(false);
 
@@ -73,6 +75,9 @@ You are inside a code execution visualizer IDE.
 
 Here is the program context:
 
+EXPLANATION LEVEL: ${level}
+(beginner = simple terms, medium = standard explanation, interview_ready = advanced concepts)
+
 CODE:
 ${code}
 
@@ -97,7 +102,7 @@ ${execution.exception ?? "None"}
 
       // Trigger the agent with a prompt
       await conversation.sendUserMessage(
-        "Explain this program's behavior step by step using the execution trace. Do not explain syntax.",
+        `Explain this program's behavior step by step using the execution trace at ${level} level. Do not explain syntax.`,
       );
     } catch (err) {
       console.error("Voice session failed:", err);
