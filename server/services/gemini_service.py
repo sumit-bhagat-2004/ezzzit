@@ -86,7 +86,7 @@ OUTPUT SCHEMA (Strict JSON):
             
             # Call Gemini
             response = self.client.models.generate_content(
-                model='gemini-2.5-flash-lite',
+                model='gemini-3-flash-preview',
                 contents=prompt,
                 config=genai.types.GenerateContentConfig(
                     response_mime_type='application/json'
