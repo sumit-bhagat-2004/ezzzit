@@ -564,8 +564,8 @@ async def explain_trace(request: TraceExplainRequest):
 
         logger.info(f"Processing {len(raw_trace)} trace steps")
 
-        # Step 2-6: Generate explanations using StepExplainer with level
-        explainer = StepExplainer(top_k_knowledge=3, level=request.level)
+        # Step 2-6: Generate explanations using StepExplainer with level-adjusted knowledge retrieval
+        explainer = StepExplainer(level=request.level)
         enriched_steps = explainer.generate_step_explanations(request.code, raw_trace)
 
         logger.info(f"Generated {len(enriched_steps)} enriched trace steps at {request.level} level")
