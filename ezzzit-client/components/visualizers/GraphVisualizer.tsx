@@ -1,7 +1,15 @@
 "use client";
-import { ReactFlow, Background, Controls, useNodesState, useEdgesState, Node, Edge } from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
-import { useEffect } from 'react';
+import {
+  ReactFlow,
+  Background,
+  Controls,
+  useNodesState,
+  useEdgesState,
+  Node,
+  Edge,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import { useEffect } from "react";
 
 interface TreeNode {
   val?: unknown;
@@ -12,26 +20,33 @@ interface TreeNode {
 }
 
 // Helper to convert recursive JSON to Nodes/Edges
-const generateTreeElements = (node: TreeNode | null, x = 0, y = 0, id = 'root', nodes: Node[] = [], edges: Edge[] = []): { nodes: Node[]; edges: Edge[] } | undefined => {
+const generateTreeElements = (
+  node: TreeNode | null,
+  x = 0,
+  y = 0,
+  id = "root",
+  nodes: Node[] = [],
+  edges: Edge[] = [],
+): { nodes: Node[]; edges: Edge[] } | undefined => {
   if (!node) return undefined;
 
   // Create Node
   nodes.push({
     id,
-    data: { label: String(node.val ?? node.value ?? 'N/A') },
+    data: { label: String(node.val ?? node.value ?? "N/A") },
     position: { x, y },
-    style: { 
-      background: '#1e1e1e', 
-      color: '#fff', 
-      border: '1px solid #6366f1', 
-      borderRadius: '50%', 
-      width: 40, 
-      height: 40, 
-      display: 'flex', 
-      justifyContent: 'center', 
-      alignItems: 'center',
-      fontSize: '12px'
-    }
+    style: {
+      background: "#1e1e1e",
+      color: "#fff",
+      border: "1px solid #6366f1",
+      borderRadius: "50%",
+      width: 40,
+      height: 40,
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      fontSize: "12px",
+    },
   });
 
   // Left Child
@@ -54,8 +69,8 @@ const generateTreeElements = (node: TreeNode | null, x = 0, y = 0, id = 'root', 
 };
 
 export default function GraphVisualizer({ data }: { data: unknown }) {
-  const [nodes, setNodes] = useNodesState([]);
-  const [edges, setEdges] = useEdgesState([]);
+  const [nodes, setNodes] = useNodesState<Node>([]);
+  const [edges, setEdges] = useEdgesState<Edge>([]);
 
   useEffect(() => {
     const elements = generateTreeElements(data as TreeNode);
@@ -66,7 +81,7 @@ export default function GraphVisualizer({ data }: { data: unknown }) {
   }, [data, setNodes, setEdges]);
 
   return (
-    <div className="h-[300px] w-full bg-[#0B0F1A] border border-white/10 rounded">
+    <div className="h-75 w-full bg-[#0B0F1A] border border-white/10 rounded">
       <ReactFlow nodes={nodes} edges={edges} fitView>
         <Background color="#333" gap={20} />
         <Controls />
