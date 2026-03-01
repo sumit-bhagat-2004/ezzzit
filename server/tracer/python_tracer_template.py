@@ -101,15 +101,34 @@ def tracer(frame, event, arg):
 
         # ─── Capture Variables ────────────────────────────────────────────────
         local_vars = {}
-        for k, v in frame.f_locals.items():
-            if k in _HARNESS_VARS or k.startswith("__"):
-                continue
-            
-            try:
-                # Use the new serializer instead of json.dumps/repr
-                local_vars[k] = serialize(v)
-            except Exception:
-                local_vars[k] = repr(v)
+        
+        # At module level (function name '<module>'), capture both locals and globals
+        # For functions, only capture locals
+        if frame.f_code.co_name == "<module>":
+            # Module-level: merge locals and globals (they're usually the same, but filter carefully)
+            all_vars = {**frame.f_globals, **frame.f_locals}
+            for k, v in all_vars.items():
+                if k in _HARNESS_VARS or k.startswith("__"):
+                    continue
+                # Skip built-in modules and functions
+                if callable(v) and hasattr(v, "__module__"):
+                    if v.__module__ in ("builtins", "sys", "json"):
+                        continue
+                
+                try:
+                    local_vars[k] = serialize(v)
+                except Exception:
+                    local_vars[k] = repr(v)
+        else:
+            # Function-level: only capture locals
+            for k, v in frame.f_locals.items():
+                if k in _HARNESS_VARS or k.startswith("__"):
+                    continue
+                
+                try:
+                    local_vars[k] = serialize(v)
+                except Exception:
+                    local_vars[k] = repr(v)
 
         TRACE_DATA.append(
             {
