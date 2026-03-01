@@ -195,6 +195,7 @@ print(result)`);
         steps: 0,
         exception: null,
         error: null,
+        ai_analysis: null,
       };
 
       if (executionRes.status === "fulfilled" && executionRes.value.ok) {
