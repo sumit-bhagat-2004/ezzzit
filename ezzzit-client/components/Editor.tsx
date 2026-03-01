@@ -18,6 +18,7 @@ type TraceStep = {
   event: string;
   call_stack_depth: number;
   variables: Record<string, unknown>;
+  explanation?: string; // RAG explanation
 };
 
 type DataStructure = {
@@ -42,6 +43,7 @@ type ExecutionResponse = {
   exception: string | null;
   error: string | null;
   ai_analysis?: AIAnalysis | null;
+  rag_explanations?: string[]; // RAG step explanations summary
 };
 
 export default function EditorUI() {
@@ -60,6 +62,7 @@ print(result)`);
 
   const [stdin, setStdin] = useState("");
   const [loading, setLoading] = useState(false);
+  const [explanationLevel, setExplanationLevel] = useState("medium");
   const [execution, setExecution] = useState<ExecutionResponse | null>(null);
   const [currentLine, setCurrentLine] = useState<number | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -83,13 +86,13 @@ print(result)`);
     playIntervalRef.current = setInterval(() => {
       const player = tracePlayerRef.current;
       if (!player) return;
-      
+
       const next = player.next();
       if (next) {
         setCurrentLine(next.line);
         setCurrentStepIndex(player.getCurrentIndex());
       }
-      
+
       if (player.isAtEnd()) {
         setIsPlaying(false);
         if (playIntervalRef.current) {
@@ -151,16 +154,64 @@ print(result)`);
     try {
       setLoading(true);
 
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/execute`,
-        {
+      // Call both APIs in parallel
+      const [executionRes, ragRes] = await Promise.allSettled([
+        // Main execution API
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/execute`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ code, language, stdin }),
-        },
-      );
+        }),
+        // RAG explanation API
+        fetch(`${process.env.NEXT_PUBLIC_RAG_API_URL}/rag/explain_trace`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code,
+            language,
+            stdin,
+            level: explanationLevel,
+          }),
+        }),
+      ]);
 
-      const data: ExecutionResponse = await res.json();
+      // Process main execution response
+      let data: ExecutionResponse = {
+        output: "",
+        trace: [],
+        steps: 0,
+        exception: null,
+        error: null,
+      };
+
+      if (executionRes.status === "fulfilled" && executionRes.value.ok) {
+        data = await executionRes.value.json();
+      } else {
+        data.error = "Failed to connect to execution server";
+        data.exception = "Network Error";
+      }
+
+      // Process RAG response and merge explanations
+      if (ragRes.status === "fulfilled" && ragRes.value.ok) {
+        const ragData = await ragRes.value.json();
+
+        // Merge RAG explanations into trace steps
+        if (ragData.trace && Array.isArray(ragData.trace)) {
+          data.trace = data.trace.map((step, idx) => {
+            const ragStep = ragData.trace[idx];
+            return {
+              ...step,
+              explanation: ragStep?.explanation || "",
+            };
+          });
+
+          // Extract all explanations for summary
+          data.rag_explanations = ragData.trace
+            .map((s: any) => s.explanation)
+            .filter(Boolean);
+        }
+      }
+
       setExecution(data);
       // Reset current line when new execution starts
       if (data.trace && data.trace.length > 0) {
@@ -201,20 +252,39 @@ print(result)`);
               main.{language === "python" ? "py" : "js"}
             </span>
 
-            <div className="flex items-center gap-2">
-              {languages.map((lang) => (
-                <button
-                  key={lang}
-                  onClick={() => setLanguage(lang)}
-                  className={`px-3 py-1 text-xs rounded-lg transition ${
-                    language === lang
-                      ? "bg-indigo-600 text-white"
-                      : "bg-white/5 text-gray-300 hover:bg-white/10"
-                  }`}
+            <div className="flex items-center gap-3">
+              {/* Explanation Level Dropdown */}
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-gray-400 font-mono">
+                  Level:
+                </label>
+                <select
+                  value={explanationLevel}
+                  onChange={(e) => setExplanationLevel(e.target.value)}
+                  className="px-3 py-1 text-xs rounded-lg bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10 transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
-                  {lang.toUpperCase()}
-                </button>
-              ))}
+                  <option value="beginner">Beginner</option>
+                  <option value="medium">Medium</option>
+                  <option value="interview_ready">Advanced</option>
+                </select>
+              </div>
+
+              {/* Language Selector */}
+              <div className="flex items-center gap-2">
+                {languages.map((lang) => (
+                  <button
+                    key={lang}
+                    onClick={() => setLanguage(lang)}
+                    className={`px-3 py-1 text-xs rounded-lg transition ${
+                      language === lang
+                        ? "bg-indigo-600 text-white"
+                        : "bg-white/5 text-gray-300 hover:bg-white/10"
+                    }`}
+                  >
+                    {lang.toUpperCase()}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -273,7 +343,20 @@ print(result)`);
 
                   {/* Action Bar */}
                   <div className="flex items-center justify-between px-3 py-2 border-t border-white/10 bg-white/2">
-                    <div />
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-gray-400 font-mono">
+                        Explain Level:
+                      </label>
+                      <select
+                        value={explanationLevel}
+                        onChange={(e) => setExplanationLevel(e.target.value)}
+                        className="px-2 py-1 text-xs rounded bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10 transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="beginner">Beginner</option>
+                        <option value="medium">Medium</option>
+                        <option value="interview_ready">Advanced</option>
+                      </select>
+                    </div>
                     <button
                       onClick={handleRun}
                       disabled={loading}
@@ -284,130 +367,192 @@ print(result)`);
                     </button>
                   </div>
                 </div>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="execution"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex-1 flex gap-0 overflow-hidden"
-          >
-            {/* Left: 4-panel grid */}
-            <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-0 h-full">
-              {/* Top Left: Original Editor */}
-              <div className="border-r border-b border-white/10 overflow-hidden">
-                <div className="h-full">
-                  <Editor
-                    height="100%"
-                    theme="vs-dark"
-                    language={language}
-                    value={code}
-                    onChange={(value) => setCode(value || "")}
-                    options={{
-                      fontSize: 13,
-                      minimap: { enabled: false },
-                      automaticLayout: true,
-                      scrollBeyondLastLine: false,
-                    }}
-                  />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="execution"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex-1 flex gap-0 overflow-hidden"
+              >
+                {/* Left: 4-panel grid */}
+                <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-0 h-full">
+                  {/* Top Left: Original Editor */}
+                  <div className="border-r border-b border-white/10 overflow-hidden flex flex-col">
+                    <div className="px-3 py-2 bg-black/30 border-b border-white/10"></div>
+                    <div className="flex-1">
+                      <Editor
+                        height="100%"
+                        theme="vs-dark"
+                        language={language}
+                        value={code}
+                        onChange={(value) => setCode(value || "")}
+                        options={{
+                          fontSize: 13,
+                          minimap: { enabled: false },
+                          automaticLayout: true,
+                          scrollBeyondLastLine: false,
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Top Right: Execution View */}
+                  <div className="border-b border-white/10 overflow-hidden">
+                    <ExecutionView
+                      code={code}
+                      language={language}
+                      currentLine={currentLine}
+                    />
+                  </div>
+
+                  {/* Bottom Left: Variables & Timeline */}
+                  <div className="border-r border-white/10 flex flex-col overflow-hidden">
+                    <div className="flex-1 overflow-auto">
+                      <VisualizerDispatcher
+                        variables={
+                          tracePlayerRef.current?.current()?.variables || {}
+                        }
+                      />
+                    </div>
+                    <TimelineControls
+                      currentStep={currentStepIndex}
+                      totalSteps={tracePlayerRef.current?.total() || 0}
+                      isPlaying={isPlaying}
+                      onPlay={handlePlay}
+                      onPause={handlePause}
+                      onNext={handleNext}
+                      onPrev={handlePrev}
+                      onReset={handleReset}
+                      onSliderChange={handleSliderChange}
+                    />
+                  </div>
+
+                  {/* Bottom Right: AI Analysis */}
+                  <div className="overflow-auto">
+                    <AIAnalysisPanel
+                      structures={execution?.ai_analysis?.structures}
+                      summary={execution?.ai_analysis?.summary}
+                    />
+                  </div>
                 </div>
-              </div>
 
-              {/* Top Right: Execution View */}
-              <div className="border-b border-white/10 overflow-hidden">
-                <ExecutionView
-                  code={code}
-                  language={language}
-                  currentLine={currentLine}
-                />
-              </div>
+                {/* Right: Output and Controls */}
+                <div className="w-96 border-l border-white/10 flex flex-col">
+                  {/* STDIN */}
+                  <div className="border-b border-white/10 bg-black/20 p-3">
+                    <label className="text-xs text-indigo-400 font-mono mb-2 block">
+                      STDIN (Input)
+                    </label>
+                    <textarea
+                      value={stdin}
+                      onChange={(e) => setStdin(e.target.value)}
+                      className="w-full h-20 resize-none rounded-lg bg-black/40 border border-white/10 p-2 text-sm text-white font-mono"
+                    />
+                  </div>
 
-              {/* Bottom Left: Variables & Timeline */}
-              <div className="border-r border-white/10 flex flex-col overflow-hidden">
-                <div className="flex-1 overflow-auto">
-                  <VisualizerDispatcher
-                    variables={tracePlayerRef.current?.current()?.variables || {}}
-                  />
+                  {/* Output */}
+                  <div className="h-48 flex flex-col border-b border-white/10">
+                    <div className="flex items-center gap-2 px-3 py-2 border-b border-white/10 text-indigo-400 text-sm font-semibold">
+                      <Terminal size={16} />
+                      Output
+                    </div>
+                    <div className="flex-1 p-3 font-mono text-xs overflow-auto">
+                      {execution?.output && (
+                        <pre className="text-green-400 whitespace-pre-wrap">
+                          {execution.output}
+                        </pre>
+                      )}
+                      {execution?.error && (
+                        <pre className="text-red-400 whitespace-pre-wrap">
+                          {execution.error}
+                        </pre>
+                      )}
+                      {!execution?.output && !execution?.error && (
+                        <p className="text-gray-500">No output</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* RAG Explanations */}
+                  <div className="flex-1 flex flex-col border-b border-white/10">
+                    <div className="flex items-center gap-2 px-3 py-2 border-b border-white/10 text-purple-400 text-sm font-semibold">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                      </svg>
+                      Step Explanations
+                    </div>
+                    <div className="flex-1 p-3 text-xs overflow-auto">
+                      {execution?.rag_explanations &&
+                      execution.rag_explanations.length > 0 ? (
+                        <div className="space-y-2">
+                          {execution.rag_explanations.map(
+                            (explanation, idx) => (
+                              <div
+                                key={idx}
+                                className="p-2 bg-purple-500/10 border border-purple-500/20 rounded text-gray-300"
+                              >
+                                <span className="text-purple-400 font-semibold">
+                                  Step {idx + 1}:{" "}
+                                </span>
+                                {explanation}
+                              </div>
+                            ),
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500">
+                          Run code to see AI-powered step-by-step explanations
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Action Bar */}
+                  <div className="flex flex-col gap-2 p-3 bg-white/2">
+                    <VoiceExplainControls
+                      execution={execution}
+                      code={code}
+                      stdin={stdin}
+                      level={explanationLevel}
+                    />
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-gray-400 font-mono">
+                        Level:
+                      </label>
+                      <select
+                        value={explanationLevel}
+                        onChange={(e) => setExplanationLevel(e.target.value)}
+                        className="flex-1 px-2 py-1 text-xs rounded bg-white/5 text-gray-300 border border-white/10 hover:bg-white/10 transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="beginner">Beginner</option>
+                        <option value="medium">Medium</option>
+                        <option value="interview_ready">Advanced</option>
+                      </select>
+                    </div>
+                    <button
+                      onClick={handleRun}
+                      disabled={loading}
+                      className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition"
+                    >
+                      <Play size={16} />
+                      {loading ? "Running..." : "Run Code"}
+                    </button>
+                  </div>
                 </div>
-                <TimelineControls
-                  currentStep={currentStepIndex}
-                  totalSteps={tracePlayerRef.current?.total() || 0}
-                  isPlaying={isPlaying}
-                  onPlay={handlePlay}
-                  onPause={handlePause}
-                  onNext={handleNext}
-                  onPrev={handlePrev}
-                  onReset={handleReset}
-                  onSliderChange={handleSliderChange}
-                />
-              </div>
-
-              {/* Bottom Right: AI Analysis */}
-              <div className="overflow-auto">
-                <AIAnalysisPanel
-                  structures={execution?.ai_analysis?.structures}
-                  summary={execution?.ai_analysis?.summary}
-                />
-              </div>
-            </div>
-
-            {/* Right: Output and Controls */}
-            <div className="w-96 border-l border-white/10 flex flex-col">
-              {/* STDIN */}
-              <div className="border-b border-white/10 bg-black/20 p-3">
-                <label className="text-xs text-indigo-400 font-mono mb-2 block">
-                  STDIN (Input)
-                </label>
-                <textarea
-                  value={stdin}
-                  onChange={(e) => setStdin(e.target.value)}
-                  className="w-full h-20 resize-none rounded-lg bg-black/40 border border-white/10 p-2 text-sm text-white font-mono"
-                />
-              </div>
-
-              {/* Output */}
-              <div className="flex-1 flex flex-col border-b border-white/10">
-                <div className="flex items-center gap-2 px-3 py-2 border-b border-white/10 text-indigo-400 text-sm font-semibold">
-                  <Terminal size={16} />
-                  Output
-                </div>
-                <div className="flex-1 p-3 font-mono text-xs overflow-auto">
-                  {execution?.output && (
-                    <pre className="text-green-400 whitespace-pre-wrap">
-                      {execution.output}
-                    </pre>
-                  )}
-                  {execution?.error && (
-                    <pre className="text-red-400 whitespace-pre-wrap">
-                      {execution.error}
-                    </pre>
-                  )}
-                  {!execution?.output && !execution?.error && (
-                    <p className="text-gray-500">No output</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Action Bar */}
-              <div className="flex flex-col gap-2 p-3 bg-white/2">
-                <VoiceExplainControls
-                  execution={execution}
-                  code={code}
-                  stdin={stdin}
-                />
-                <button
-                  onClick={handleRun}
-                  disabled={loading}
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition"
-                >
-                  <Play size={16} />
-                  {loading ? "Running..." : "Run Code"}
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
       </div>
     </div>
