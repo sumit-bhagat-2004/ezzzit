@@ -338,7 +338,7 @@ class StepExplainer:
                 'step': step.get('step'),
                 'line': step.get('line'),
                 'variables': step.get('variables', {}),
-                'explanation': explanation  # CLEAN, NO MARKDOWN
+                'explanation': explanation 
             })
         
         logger.info(f"Generated {len(enriched)} clean explanations")
